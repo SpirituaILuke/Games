@@ -1,5 +1,4 @@
 -- // Todo:
--- ~~[Improve the clipping, in some instances u get stuck in the floor for a bit or you can't pass thru at all anymore]~~
 -- [Add 'Auto Void' when ever the boss reaches less then 50% health (Since If you void a boss when the health is above 50% you won't get anything)]
 
 local GetService = setmetatable({}, {
@@ -317,6 +316,9 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 			repeat
 				task.wait();
 				Distance = RoundVector(RootPart.Position - EntityRoot.Position).Magnitude
+
+			    RootPart.CFrame = CFrame.lookAt(RootPart.Position, Vector3.new(EntityRoot.Position.X, RootPart.Position.Y, EntityRoot.Position.Z))
+
 				TweenTeleport(CFrame.new(EntityRoot.Position), {
 					tweenSpeedIgnoreY = true,
 					offset = CFrame.new(0, 5, 0)
