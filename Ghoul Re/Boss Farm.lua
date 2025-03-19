@@ -1,6 +1,5 @@
 -- // Todo:
-
--- [Improve the clipping, in some instances u get stuck in the floor for a bit or you can't pass thru at all anymore]
+-- ~~[Improve the clipping, in some instances u get stuck in the floor for a bit or you can't pass thru at all anymore]~~
 -- [Add 'Auto Void' when ever the boss reaches less then 50% health (Since If you void a boss when the health is above 50% you won't get anything)]
 
 local GetService = setmetatable({}, {
@@ -77,7 +76,40 @@ end
 
 Maid.Destroy = Maid.Cleanup
 
-local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillBoss, TweenTeleport, NoPhysics, RoundVector, ClearTweens, NoPhysicsOff, PlayerAdded, CharacterAdded, GetComponents, EquipWeapon, LightAttack, NoClip do
+local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillBoss, TweenTeleport, NoPhysics, RoundVector, ClearTweens, NoPhysicsOff, PlayerAdded, CharacterAdded, GetComponents, EquipWeapon, LightAttack, NoClip, DetectFloor do
+	DetectFloor = function(startPos, voidPos)
+		local ignoredParts = {}
+
+		local direction = (voidPos - startPos).unit
+		local distance = (startPos - voidPos).Magnitude
+		local position = startPos
+
+		while (position.Y > voidPos.Y) do
+			local raycastParams = RaycastParams.new()
+			raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+			raycastParams.FilterDescendantsInstances = {Player.Character}
+
+			local result = Workspace:Raycast(position, direction * -5, raycastParams)
+
+			if result and result.Instance then
+				local floorPart = result.Instance
+				if floorPart:IsA("BasePart") and not ignoredParts[floorPart] then
+					ignoredParts[floorPart] = {
+						Transparency = floorPart.Transparency,
+						CanCollide = floorPart.CanCollide
+					}
+
+					floorPart.Transparency = 1
+					floorPart.CanCollide = false
+				end
+			end
+
+			position = position - Vector3.new(0, 5, 0)
+		end
+
+		return ignoredParts
+	end
+	
 	NoClip = function(Toggle)
 		local Character = Player.Character or Player.CharacterAdded:Wait()
 
@@ -215,8 +247,11 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 		if (Options.instant) then
 			Options.tweenSpeed = 1000
 		end
-
-		NoClip(true)
+		
+		if not Options.NoNoClip then
+			NoClip(true)
+		end
+		
 		NoPhysics(Options)
 
 		local maid = Maid.new();
@@ -298,7 +333,7 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 		if not Character then
 			return
 		end
-		
+
 		if Character:FindFirstChild("ForceField") then
 			local Boss = GetEntity()
 			if Boss then
@@ -308,6 +343,7 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 		end
 
 		local VoidPosition = Vector3.new(RootPart.Position.X, FallenHeight + 5, RootPart.Position.Z)
+		local FloorSegments = DetectFloor(RootPart.Position, VoidPosition)
 		local Distance = (RootPart.Position - VoidPosition).Magnitude
 
 		repeat
@@ -318,12 +354,20 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 				tweenSpeedIgnoreY = false,
 				offset = CFrame.new(0, -2, 0),
 				tweenSpeed = 180,
+				NoNoClip = true;
 			});
 		until Distance <= 5 or not Character:FindFirstChild("HumanoidRootPart")
 
 		ClearTweens(); NoPhysicsOff()
 		RunService.Heartbeat:Wait()
-
+		
+		for FloorPart, Properties in next, FloorSegments do
+			if FloorPart then
+				FloorPart.Transparency = Properties.Transparency
+				FloorPart.CanCollide = Properties.CanCollide
+			end
+		end
+	
 		local newCharacter = Player.CharacterAdded:Wait()
 		repeat task.wait() until newCharacter:FindFirstChild("HumanoidRootPart")
 
@@ -333,26 +377,13 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 		end
 	end
 
-	BelowHealth = function(Amount)
-		local Character, Humanoid, RootPart = GetComponents()
-
-		if not Character then
-			return
-		end
-
-		if Humanoid.Health < Amount then
-			return true
-		end
-
-		return false
-	end
-
 	NormalizeName = function(String)
 		return String:match("^[^_]+")
 	end
 
 	KillBoss = function(Data)
-		task.wait(3)
+		task.wait(2)
+
 		local Character, Humanoid, RootPart = GetComponents()
 
 		if not Character:FindFirstChild("ForceField") then
