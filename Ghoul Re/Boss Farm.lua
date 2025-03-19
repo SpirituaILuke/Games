@@ -1,6 +1,3 @@
--- // Todo:
--- [Add 'Auto Void' when ever the boss reaches less then 50% health (Since If you void a boss when the health is above 50% you won't get anything)]
-
 local GetService = setmetatable({}, {
 	__call = function(self, key)
 		local service = rawget(self, key)
@@ -23,8 +20,12 @@ local GetService = setmetatable({}, {
 	end
 })
 
+getgenv().Dependencies = {
+	Notifier = loadstring(game:HttpGet("https://raw.githubusercontent.com/IceMinisterq/Notification-Library/Main/Library.lua"))(),
+}
+
 getgenv().noClip = false;
-getgenv().Respawning = false;
+getgenv().voidBoss = false;
 
 getgenv().Maid = {};
 getgenv().Tweens = {};
@@ -34,6 +35,7 @@ local TweenService = GetService("TweenService")
 local Workspace = GetService("Workspace")
 local RunService = GetService("RunService")
 local ReplicatedStorage = GetService("ReplicatedStorage")
+local HttpService = GetService("HttpService")
 
 local Player = Players.LocalPlayer
 
@@ -108,7 +110,7 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 
 		return ignoredParts
 	end
-	
+
 	NoClip = function(Toggle)
 		local Character = Player.Character or Player.CharacterAdded:Wait()
 
@@ -246,11 +248,11 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 		if (Options.instant) then
 			Options.tweenSpeed = 1000
 		end
-		
+
 		if not Options.NoNoClip then
 			NoClip(true)
 		end
-		
+
 		NoPhysics(Options)
 
 		local maid = Maid.new();
@@ -317,7 +319,7 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 				task.wait();
 				Distance = RoundVector(RootPart.Position - EntityRoot.Position).Magnitude
 
-			    RootPart.CFrame = CFrame.lookAt(RootPart.Position, Vector3.new(EntityRoot.Position.X, RootPart.Position.Y, EntityRoot.Position.Z))
+				RootPart.CFrame = CFrame.lookAt(RootPart.Position, Vector3.new(EntityRoot.Position.X, RootPart.Position.Y, EntityRoot.Position.Z))
 
 				TweenTeleport(CFrame.new(EntityRoot.Position), {
 					tweenSpeedIgnoreY = true,
@@ -362,14 +364,14 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 
 		ClearTweens(); NoPhysicsOff()
 		RunService.Heartbeat:Wait()
-		
+
 		for FloorPart, Properties in next, FloorSegments do
 			if FloorPart then
 				FloorPart.Transparency = Properties.Transparency
 				FloorPart.CanCollide = Properties.CanCollide
 			end
 		end
-	
+
 		local newCharacter = Player.CharacterAdded:Wait()
 		repeat task.wait() until newCharacter:FindFirstChild("HumanoidRootPart")
 
@@ -403,6 +405,29 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 			task.wait(0.001)
 			local CurrentTime = tick()
 
+			local Percentage = (EntityHumanoid.Health / EntityHumanoid.MaxHealth) * 100
+			if Percentage <= 30 then
+				if not voidBoss then
+					local maid = Maid.new()
+					voidBoss = maid
+
+                    Dependencies.Notifier:SendNotification("Info", `{NormalizeName(Data.Entity.Name)} is at {string.format("%.1f", Percentage)} % HP, attempting to void`, 5)
+
+					maid:GiveTask(RunService.Heartbeat:Connect(function()
+						sethiddenproperty(Player, "MaxSimulationRadius", math.huge);
+						sethiddenproperty(Player, "SimulationRadius", math.huge);
+					end))
+
+					maid:GiveTask(task.spawn(function()
+						while task.wait() do
+							if EntityRoot and isnetworkowner(EntityRoot) then
+								EntityHumanoid.Health = 0;
+							end
+						end
+					end))
+				end
+			end
+
 			if Character and not Character.Toggle.Value and (CurrentTime - LastEquipCheck) > 1 then
 				EquipWeapon(); LastEquipCheck = CurrentTime;
 			end
@@ -422,15 +447,32 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 			end
 
 		until not Data.Entity.Parent or Data.Entity.Humanoid.Health <= 0
+		if voidBoss then
+			voidBoss:Cleanup(); voidBoss = nil
+		end
 	end
+end
+
+if game.PlaceId ~= 89413197677760 then
+	return Dependencies.Notifier:SendNotification("Error", `Script has been ran in the wrong place! Run it in the 'Boss Place'!`, 4)
+end
+
+if not (Player:GetAttribute("FULLYLOADED") and Player:GetAttribute("Loaded")) then
+	Dependencies.Notifier:SendNotification("Info", "Not loaded, waiting for load...", 4)
+
+	repeat
+		task.wait()
+	until Player:GetAttribute("FULLYLOADED") and Player:GetAttribute("Loaded")
+
+	Dependencies.Notifier:SendNotification("Info", `Player has loaded in!`, 4)
 end
 
 local Boss = GetEntity()
 if not Boss then
-	return warn(`No boss found.`)
+	Dependencies.Notifier:SendNotification("Warning", `Waiting for the boss to spawn in.`, 5)
+	repeat 
+		task.wait(); Boss = GetEntity()
+	until Boss ~= nil
 end
 
---warn(`Found [{NormalizeName(Boss.Name)}]!`)
-
 KillBoss({ Entity = Boss })
-
