@@ -1,3 +1,4 @@
+-- By @Spirit
 
 local GetService = setmetatable({}, {
 	__call = function(self, key)
@@ -28,13 +29,18 @@ getgenv().Dependencies = {
 	Notifier = loadstring(game:HttpGet("https://raw.githubusercontent.com/IceMinisterq/Notification-Library/Main/Library.lua"))(),
 }
 
+getgenv().Adjustments = {
+	Noro = 20,
+	Tatara = 30,
+	Eto = 20,
+}
+
 getgenv().noClip = false;
 getgenv().voidBoss = false;
 getgenv().stopFarm = false;
 getgenv().LogI = false;
 
 getgenv().lastHealth = 0;
-getgenv().StartedTime = 0;
 getgenv().FFLifeTime = 40;
 
 getgenv().Maid = {};
@@ -334,7 +340,8 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 
 				TweenTeleport(CFrame.new(EntityRoot.Position), {
 					tweenSpeedIgnoreY = true,
-					offset = CFrame.new(0, 5, 0)
+					offset = CFrame.new(0, 5, 0),
+					tweenSpeed = 230,
 				});
 			until Distance <= 10
 		end
@@ -370,7 +377,7 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 			TweenTeleport(CFrame.new(VoidPosition), {
 				tweenSpeedIgnoreY = false,
 				offset = CFrame.new(0, -2, 0),
-				tweenSpeed = 180,
+				tweenSpeed = 230,
 				NoNoClip = true;
 			});
 		until Distance <= 5 or not Character:FindFirstChild("HumanoidRootPart")
@@ -409,13 +416,13 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 			RespawnCharacter()
 			return
 		end
-		
+
 		if stopFarm then
 			return
 		end
-		
+
 		if FFLifeTime > 0 then
-			local RTime = FFLifeTime - 10
+			local RTime = FFLifeTime - 5
 			task.delay(RTime, function()
 				if Character:FindFirstChild("ForceField") then
 					RespawnCharacter();
@@ -456,6 +463,7 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 
 			if Percentage <= 35 then
 				if not voidBoss then
+					print("ATTEMPTING TO VOID!")
 					local maid = Maid.new()
 					voidBoss = maid
 
@@ -485,7 +493,7 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 				GotoEntity(Data.Entity);
 			end
 
-			if Character.Toggle.Value and Distance < 10 then
+			if Character.Toggle.Value and Distance < 10 and Character.Combo.Value < 4 then
 				LightAttack();
 			end
 
@@ -591,8 +599,8 @@ if not Boss then
 	until Boss ~= nil
 end
 
-
-KillBoss({ Entity = Boss }); StartedTime = os.clock();
+FFLifeTime = Adjustments[NormalizeName(Boss.Name)] or FFLifeTime;
+KillBoss({ Entity = Boss });
 
 task.spawn(function()
 	while true do
