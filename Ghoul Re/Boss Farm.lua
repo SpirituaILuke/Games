@@ -129,8 +129,7 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 	end
 
 	NoClip = function(Toggle)
-		local Character = Player.Character or Player.CharacterAdded:Wait()
-
+		local Character, Humanoid, RootPart = GetComponents()
 		if not Toggle then
 			if noClip then
 				noClip:Cleanup()
@@ -155,7 +154,6 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 						Part.CanCollide = false
 					end
 				end
-
 
 				for _, FakeHead in next, workspace.FakeHeads:GetChildren() do
 					if FakeHead:IsA("BasePart") and string.find(FakeHead.Name, Player.Name) then
@@ -351,7 +349,6 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 
 	RespawnCharacter = function()
 		local Character, Humanoid, RootPart = GetComponents()
-
 		if not Character then
 			return
 		end
@@ -367,8 +364,24 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 		stopFarm = true
 
 		local VoidPosition = Vector3.new(RootPart.Position.X, FallenHeight + 5, RootPart.Position.Z)
-		local FloorSegments = DetectFloor(RootPart.Position, VoidPosition)
 		local Distance = (RootPart.Position - VoidPosition).Magnitude
+
+		task.spawn(function()
+			while stopFarm do
+				task.wait(0.1)
+				for _, part in pairs(Player.Character:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.CanCollide = false
+					end
+				end
+
+				for _, FakeHead in next, workspace.FakeHeads:GetChildren() do
+					if FakeHead:IsA("BasePart") and string.find(FakeHead.Name, Player.Name) then
+						FakeHead.CanCollide = false
+					end
+				end
+			end
+		end)
 
 		repeat
 			task.wait();
@@ -383,15 +396,8 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 		until Distance <= 5 or not Character:FindFirstChild("HumanoidRootPart")
 
 		ClearTweens(); NoPhysicsOff()
+		
 		RunService.Heartbeat:Wait()
-
-		for FloorPart, Properties in next, FloorSegments do
-			if FloorPart then
-				FloorPart.Transparency = Properties.Transparency
-				FloorPart.CanCollide = Properties.CanCollide
-			end
-		end
-
 		stopFarm = false
 
 		local newCharacter = Player.CharacterAdded:Wait()
@@ -463,7 +469,6 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 
 			if Percentage <= 35 then
 				if not voidBoss then
-					print("ATTEMPTING TO VOID!")
 					local maid = Maid.new()
 					voidBoss = maid
 
