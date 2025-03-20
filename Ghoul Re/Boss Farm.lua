@@ -35,6 +35,7 @@ getgenv().LogI = false;
 
 getgenv().lastHealth = 0;
 getgenv().StartedTime = 0;
+getgenv().FFLifeTime = 0;
 
 getgenv().Maid = {};
 getgenv().Tweens = {};
@@ -83,6 +84,7 @@ function Maid:Cleanup()
 	end
 	table.clear(self._tasks)
 end
+
 
 Maid.Destroy = Maid.Cleanup
 
@@ -347,13 +349,15 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 			return
 		end
 
-		if Character:FindFirstChild("ForceField") then
+		if Character:FindFirstChild("ForceField") and FFLifeTime <= 0 then
 			local Boss = GetEntity()
 			if Boss then
 				KillBoss({ Entity = Boss })
 			end
 			return
 		end
+
+		stopFarm = true
 
 		local VoidPosition = Vector3.new(RootPart.Position.X, FallenHeight + 5, RootPart.Position.Z)
 		local FloorSegments = DetectFloor(RootPart.Position, VoidPosition)
@@ -381,6 +385,8 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 			end
 		end
 
+		stopFarm = false
+
 		local newCharacter = Player.CharacterAdded:Wait()
 		repeat task.wait() until newCharacter:FindFirstChild("HumanoidRootPart")
 
@@ -395,7 +401,7 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 	end
 
 	KillBoss = function(Data)
-		task.wait(2)
+		task.wait(1)
 
 		local Character, Humanoid, RootPart = GetComponents()
 
@@ -406,6 +412,16 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 		
 		if stopFarm then
 			return
+		end
+		
+		if FFLifeTime > 0 then
+			local RTime = FFLifeTime - 10
+			print('Starting respawn task!')
+			task.delay(RTime, function()
+				if Character:FindFirstChild("ForceField") then
+					RespawnCharacter();
+				end
+			end)
 		end
 
 		if not OldBackpack then
@@ -479,15 +495,15 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 				break
 			end
 
-		until not Data.Entity.Parent or Data.Entity.Humanoid.Health <= 0 or stopFarm
+		until not Data.Entity.Parent or Data.Entity.Humanoid.Health <= 0 or stopFarm        
 		if voidBoss then
 			voidBoss:Cleanup(); voidBoss = nil
 		end
 
 		if lastHealth <= 35 and not LogI then
 			LogI = true;
-			task.wait(1.5)
-			
+
+			Player.Backpack.ChildAdded:Wait()
 			local NewBackpack = {}
 
 			for _, Item in next, Player.Backpack:GetChildren() do
@@ -559,6 +575,23 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 	end
 end
 
+local function TrackForceField()
+	local Character = Player.Character
+	if not Character then return end
+
+	local ff = Character:WaitForChild("ForceField")
+	if ff then
+		local startTime = tick()
+
+		ff.Destroying:Once(function()
+			local duration = tick() - startTime
+			if FFLifeTime <= 0 then
+				FFLifeTime = duration; print("FF Duration set to " .. FFLifeTime)
+			end
+		end)
+	end
+end
+
 if game.PlaceId ~= 89413197677760 then
 	return Dependencies.Notifier:SendNotification("Error", `Script has been ran in the wrong place! Run it in the 'Boss Place'!`, 4)
 end
@@ -574,12 +607,15 @@ if not (Player:GetAttribute("FULLYLOADED") and Player:GetAttribute("Loaded")) th
 end
 
 local Boss = GetEntity()
+TrackForceField();
+
 if not Boss then
 	Dependencies.Notifier:SendNotification("Warning", `Waiting for the boss to spawn in.`, 5)
 	repeat 
 		task.wait(); Boss = GetEntity()
 	until Boss ~= nil
 end
+
 
 KillBoss({ Entity = Boss }); StartedTime = os.clock();
 
@@ -608,4 +644,3 @@ task.spawn(function()
 		task.wait()
 	end
 end)
-
