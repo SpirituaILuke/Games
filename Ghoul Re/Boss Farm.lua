@@ -22,7 +22,7 @@ local GetService = setmetatable({}, {
 })
 
 local Webhook = loadstring(game:HttpGet("https://pastebin.com/raw/9YZiENVd", true))()
-local debugWebhook = Webhook.new('https://discord.com/api/webhooks/1352050830060032032/hFRmFdIObq-ySnM4hRun45b0Oitq7TKx20I4m4ZzmrEeltFsPidr9k4CZHVz0zCj_tWr')
+local debugWebhook = Webhook.new('')
 
 getgenv().Dependencies = {
 	Notifier = loadstring(game:HttpGet("https://raw.githubusercontent.com/IceMinisterq/Notification-Library/Main/Library.lua"))(),
@@ -35,7 +35,7 @@ getgenv().LogI = false;
 
 getgenv().lastHealth = 0;
 getgenv().StartedTime = 0;
-getgenv().FFLifeTime = 0;
+getgenv().FFLifeTime = 40;
 
 getgenv().Maid = {};
 getgenv().Tweens = {};
@@ -416,7 +416,6 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 		
 		if FFLifeTime > 0 then
 			local RTime = FFLifeTime - 10
-			print('Starting respawn task!')
 			task.delay(RTime, function()
 				if Character:FindFirstChild("ForceField") then
 					RespawnCharacter();
@@ -530,12 +529,6 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 				end
 			end
 
-			local KillTime = os.clock() - StartedTime
-			local hours = math.floor(KillTime / 3600)
-			local minutes = math.floor((KillTime % 3600) / 60)
-			local seconds = math.floor(KillTime % 60)
-
-			local formattedTime = string.format("%02d:%02d:%02d", hours, minutes, seconds)
 			local lootDescription = ""
 
 			if #newItems > 0 then
@@ -564,7 +557,7 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 						color = 0x00FF00,
 						fields = {
 							{ name = "Boss Name", value = NormalizeName(Data.Entity.Name), inline = true },
-							{ name = "Loot", value = lootDescription, inline = false },
+							{ name = "[Loot]", value = lootDescription, inline = false },
 						},
 					}
 				}
@@ -572,23 +565,6 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 
 			debugWebhook:Send(webhookData)
 		end
-	end
-end
-
-local function TrackForceField()
-	local Character = Player.Character
-	if not Character then return end
-
-	local ff = Character:WaitForChild("ForceField")
-	if ff then
-		local startTime = tick()
-
-		ff.Destroying:Once(function()
-			local duration = tick() - startTime
-			if FFLifeTime <= 0 then
-				FFLifeTime = duration; print("FF Duration set to " .. FFLifeTime)
-			end
-		end)
 	end
 end
 
@@ -607,7 +583,6 @@ if not (Player:GetAttribute("FULLYLOADED") and Player:GetAttribute("Loaded")) th
 end
 
 local Boss = GetEntity()
-TrackForceField();
 
 if not Boss then
 	Dependencies.Notifier:SendNotification("Warning", `Waiting for the boss to spawn in.`, 5)
