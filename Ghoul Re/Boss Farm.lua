@@ -1,3 +1,4 @@
+
 local GetService = setmetatable({}, {
 	__call = function(self, key)
 		local service = rawget(self, key)
@@ -20,12 +21,20 @@ local GetService = setmetatable({}, {
 	end
 })
 
+local Webhook = loadstring(game:HttpGet("https://pastebin.com/raw/9YZiENVd", true))()
+local debugWebhook = Webhook.new('https://discord.com/api/webhooks/1352050830060032032/hFRmFdIObq-ySnM4hRun45b0Oitq7TKx20I4m4ZzmrEeltFsPidr9k4CZHVz0zCj_tWr')
+
 getgenv().Dependencies = {
 	Notifier = loadstring(game:HttpGet("https://raw.githubusercontent.com/IceMinisterq/Notification-Library/Main/Library.lua"))(),
 }
 
 getgenv().noClip = false;
 getgenv().voidBoss = false;
+getgenv().stopFarm = false;
+getgenv().LogI = false;
+
+getgenv().lastHealth = 0;
+getgenv().StartedTime = 0;
 
 getgenv().Maid = {};
 getgenv().Tweens = {};
@@ -77,7 +86,7 @@ end
 
 Maid.Destroy = Maid.Cleanup
 
-local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillBoss, TweenTeleport, NoPhysics, RoundVector, ClearTweens, NoPhysicsOff, PlayerAdded, CharacterAdded, GetComponents, EquipWeapon, LightAttack, NoClip, DetectFloor do
+local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillBoss, TweenTeleport, NoPhysics, RoundVector, ClearTweens, NoPhysicsOff, GetComponents, EquipWeapon, LightAttack, NoClip, DetectFloor do    
 	DetectFloor = function(startPos, voidPos)
 		local ignoredParts = {}
 
@@ -394,6 +403,26 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 			RespawnCharacter()
 			return
 		end
+		
+		if stopFarm then
+			return
+		end
+
+		if not OldBackpack then
+			getgenv().OldBackpack = {};
+
+			for _, Item in next, Player.Backpack:GetChildren() do
+				if not Item:IsA("Tool") then
+					continue
+				end
+
+				if Item:GetAttribute("CooldownDuration") then
+					continue -- Ignore skills
+				end
+
+				OldBackpack[Item.Name] = (Item:FindFirstChild("Quantity") and Item.Quantity.Value) or 1
+			end
+		end
 
 		local EntityHumanoid = Data.Entity:FindFirstChildOfClass("Humanoid")
 		local EntityRoot = EntityHumanoid and EntityHumanoid.RootPart
@@ -406,12 +435,16 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 			local CurrentTime = tick()
 
 			local Percentage = (EntityHumanoid.Health / EntityHumanoid.MaxHealth) * 100
-			if Percentage <= 30 then
+			if Percentage ~= nil then
+				lastHealth = Percentage;
+			end
+
+			if Percentage <= 35 then
 				if not voidBoss then
 					local maid = Maid.new()
 					voidBoss = maid
 
-                    Dependencies.Notifier:SendNotification("Info", `{NormalizeName(Data.Entity.Name)} is at {string.format("%.1f", Percentage)} % HP, attempting to void`, 5)
+					Dependencies.Notifier:SendNotification("Info", `{NormalizeName(Data.Entity.Name)} is at {string.format("%.1f", Percentage)} % HP, attempting to void`, 5)
 
 					maid:GiveTask(RunService.Heartbeat:Connect(function()
 						sethiddenproperty(Player, "MaxSimulationRadius", math.huge);
@@ -446,9 +479,82 @@ local GetEntity, GotoEntity, NormalizeName, RespawnCharacter, CheckHealth, KillB
 				break
 			end
 
-		until not Data.Entity.Parent or Data.Entity.Humanoid.Health <= 0
+		until not Data.Entity.Parent or Data.Entity.Humanoid.Health <= 0 or stopFarm
 		if voidBoss then
 			voidBoss:Cleanup(); voidBoss = nil
+		end
+
+		if lastHealth <= 35 and not LogI then
+			LogI = true;
+			task.wait(1.5)
+			
+			local NewBackpack = {}
+
+			for _, Item in next, Player.Backpack:GetChildren() do
+				if not Item:IsA("Tool") then
+					continue
+				end
+
+				if Item:GetAttribute("CooldownDuration") then
+					continue -- Ignore skills
+				end
+
+				NewBackpack[Item.Name] = (Item:FindFirstChild("Quantity") and Item.Quantity.Value) or 1
+			end
+
+			local newItems = {}
+			local itemChanges = {}
+
+			for itemName, newQuantity in pairs(NewBackpack) do
+				local oldQuantity = OldBackpack[itemName] or 0
+				if oldQuantity == 0 then
+					table.insert(newItems, itemName)
+				elseif newQuantity > oldQuantity then
+					table.insert(itemChanges, { name = itemName, count = newQuantity - oldQuantity })
+				end
+			end
+
+			local KillTime = os.clock() - StartedTime
+			local hours = math.floor(KillTime / 3600)
+			local minutes = math.floor((KillTime % 3600) / 60)
+			local seconds = math.floor(KillTime % 60)
+
+			local formattedTime = string.format("%02d:%02d:%02d", hours, minutes, seconds)
+			local lootDescription = ""
+
+			if #newItems > 0 then
+				lootDescription = lootDescription .. "**New Items:**\n"
+				for _, item in ipairs(newItems) do
+					lootDescription = lootDescription .. "- " .. item .. "\n"
+				end
+			end
+
+			if #itemChanges > 0 then
+				lootDescription = lootDescription .. "**Increased Items:**\n"
+				for _, item in ipairs(itemChanges) do
+					lootDescription = lootDescription .. "- " .. item.name .. " x" .. item.count .. "\n"
+				end
+			end
+
+			if lootDescription == "" then
+				lootDescription = "No new items or increases."
+			end
+
+			local webhookData = {
+				embeds = {
+					{
+						title = "Boss Defeated",
+						description = string.format("Successfully killed the boss."),
+						color = 0x00FF00,
+						fields = {
+							{ name = "Boss Name", value = NormalizeName(Data.Entity.Name), inline = true },
+							{ name = "Loot", value = lootDescription, inline = false },
+						},
+					}
+				}
+			}
+
+			debugWebhook:Send(webhookData)
 		end
 	end
 end
@@ -475,4 +581,31 @@ if not Boss then
 	until Boss ~= nil
 end
 
-KillBoss({ Entity = Boss })
+KillBoss({ Entity = Boss }); StartedTime = os.clock();
+
+task.spawn(function()
+	while true do
+		if not Boss.Parent and lastHealth >= 40 then
+			local webhookData = {
+				embeds = {
+					{
+						title = "Boss Failure",
+						description = "Something went wrong during the boss fight.",
+						color = 0xFF0000,
+						fields = {
+							{ name = "Last Boss Health", value = lastHealth .. "%", inline = true },
+							{ name = "Boss", value = NormalizeName(Boss.Name), inline = true },
+
+						},
+						timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+					}
+				}
+			}
+
+			debugWebhook:Send(webhookData)
+			break
+		end
+		task.wait()
+	end
+end)
+
